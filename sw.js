@@ -1,6 +1,6 @@
 // Service Worker: віддає файли плеєблів з IndexedDB за адресами ./play/<id>/<шлях>
 // (тож працюють багатофайлові zip, fetch, відео) і кешує сам застосунок для миттєвого й офлайн-запуску.
-const SHELL = 'playables-shell-v1';
+const SHELL = 'playables-shell-v2';
 const SHELL_FILES = ['./', 'index.html', 'inject.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 const SCOPE = self.registration.scope;
 const PLAY = new URL('play/', SCOPE).pathname;
@@ -31,19 +31,18 @@ self.addEventListener('fetch', (e) => {
   else e.respondWith(serveShell(req, e));
 });
 
-// Оболонка: одразу з кешу, оновлення — у фоні
+// Оболонка: свіжа версія з мережі (щоб оновлення на GitHub з'являлися одразу),
+// а якщо мережа повільна чи її немає — з кешу
 async function serveShell(req, e) {
   const cache = await caches.open(SHELL);
-  const cached = await cache.match(req, { ignoreSearch: true });
-  const fresh = fetch(req).then((res) => {
+  const network = fetch(req.url, { cache: 'no-cache' }).then((res) => {
     if (res.ok && !res.redirected) cache.put(req, res.clone());
     return res;
   });
-  if (cached) {
-    e.waitUntil(fresh.catch(() => {}));
-    return cached;
-  }
-  return fresh;
+  e.waitUntil(network.catch(() => {}));
+  const quick = await Promise.race([network.catch(() => null), new Promise((r) => setTimeout(r, 1500))]);
+  if (quick) return quick;
+  return (await cache.match(req, { ignoreSearch: true })) || network;
 }
 
 async function servePlayable(req, url) {
