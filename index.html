@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Playables</title>
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Playables">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f6fa;
+    --surface: #ffffff;
+    --ink: #14161d;
+    --muted: #6a6f7e;
+    --line: #e3e6ee;
+    --accent: #3443f0;
+    --accent-ink: #ffffff;
+    --danger: #d23636;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #000000;
+      --surface: #15171d;
+      --ink: #f2f3f7;
+      --muted: #8c91a0;
+      --line: #262933;
+      --accent: #7480ff;
+      --accent-ink: #090b14;
+      --danger: #ff6b6b;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overscroll-behavior: none; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  body.playing { overflow: hidden; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  svg { display: block; }
+
+  #app {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: calc(env(safe-area-inset-top) + 20px) max(16px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 32px) max(16px, env(safe-area-inset-left));
+  }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  h1 { flex: 1; margin: 0; font-size: 30px; font-weight: 750; letter-spacing: -0.025em; }
+
+  .chip {
+    height: 36px; padding: 0 14px; border-radius: 18px;
+    font-size: 14px; font-weight: 600;
+    border: 1.5px solid var(--line); color: var(--muted);
+  }
+  .chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  .add {
+    width: 44px; height: 44px; border-radius: 14px;
+    display: grid; place-items: center;
+    background: var(--accent); color: var(--accent-ink);
+  }
+
+  #hint { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
+
+  #list { list-style: none; margin: 0; padding: 0; border-radius: 16px; overflow: hidden; background: var(--surface); }
+  #list:empty { display: none; }
+  #list li { display: flex; align-items: center; }
+  #list li + li { border-top: 1px solid var(--line); }
+  .item { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 12px 4px 12px 14px; text-align: left; }
+  .thumb {
+    flex: none; width: 40px; height: 40px; border-radius: 12px;
+    display: grid; place-items: center;
+    background: var(--bg); color: var(--accent);
+  }
+  .text { flex: 1; min-width: 0; }
+  .name { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta { display: block; font-size: 13px; color: var(--muted); }
+  .size { flex: none; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .del { flex: none; width: 44px; height: 44px; display: grid; place-items: center; color: var(--muted); }
+  .del:hover { color: var(--danger); }
+  @media (hover: hover) { .item:hover .thumb { background: var(--accent); color: var(--accent-ink); } }
+
+  #empty { padding: 48px 8px; text-align: center; }
+  #empty h2 { margin: 0 0 6px; font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+  #empty p { margin: 0 auto 20px; max-width: 34ch; color: var(--muted); font-size: 15px; }
+  .primary { height: 48px; padding: 0 24px; border-radius: 14px; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+  #drop {
+    position: fixed; inset: 10px; z-index: 30; border-radius: 24px;
+    border: 3px dashed var(--accent); background: color-mix(in srgb, var(--bg) 85%, transparent);
+    display: grid; place-items: center; font-size: 20px; font-weight: 650; color: var(--accent);
+    pointer-events: none;
+  }
+
+  #player { position: fixed; inset: 0; z-index: 20; background: #000; }
+  #player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: #000; }
+  .controls {
+    position: absolute; z-index: 1; display: flex; gap: 10px;
+    top: calc(env(safe-area-inset-top) + 8px); left: calc(env(safe-area-inset-left) + 8px);
+  }
+  .controls button {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: rgba(0, 0, 0, 0.5); color: #fff; opacity: 0.45;
+  }
+  .controls button:hover, .controls button:focus-visible { opacity: 1; }
+
+  #toast {
+    position: fixed; z-index: 40; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 16px);
+    transform: translate(-50%, 8px);
+    max-width: min(92vw, 560px); padding: 9px 14px; border-radius: 12px;
+    background: rgba(18, 20, 26, 0.9); color: #fff; font-size: 13px; line-height: 1.35;
+    overflow-wrap: anywhere; pointer-events: none;
+    opacity: 0; transition: opacity 0.15s, transform 0.15s;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main id="app">
+  <header>
+    <h1>Playables</h1>
+    <button id="sdk" class="chip" aria-pressed="true" title="Емуляція рекламних SDK: MRAID, ironSource dapi, Meta, Google, Mintegral, Vungle">SDK</button>
+    <button id="add" class="add" aria-label="Додати плеєбли">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v14M3 10h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+    </button>
+  </header>
+  <p id="hint" hidden>Щоб плеєбли грали на весь екран, натисни «Поділитися» → «На початковий екран» і відкривай з іконки.</p>
+  <ul id="list"></ul>
+  <section id="empty" hidden>
+    <h2>Додай перший плеєбл</h2>
+    <p>Підходять .html і .zip. На комп’ютері файли можна просто перетягнути у вікно.</p>
+    <button id="add2" class="primary">Вибрати файли</button>
+  </section>
+  <input id="file" type="file" accept=".html,.htm,.zip,text/html,application/zip" multiple hidden>
+</main>
+
+<div id="player" hidden>
+  <div class="controls">
+    <button id="close" aria-label="Закрити">
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </button>
+    <button id="restart" aria-label="Перезапустити">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 11.6 3.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12.6 1v3.6H9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</div>
+<div id="drop" hidden>Відпусти, щоб додати</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const ICON_PLAY = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5z" fill="currentColor"/></svg>';
+const ICON_TRASH = '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 5h12M7 5V3h4v2M5 5l.8 10h6.4L13 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+const standalone = matchMedia('(display-mode: standalone)').matches
+  || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const swSupported = 'serviceWorker' in navigator && window.isSecureContext && location.protocol !== 'file:';
+
+let db = null;
+let items = [];
+let emulate = localStorage.getItem('pp.emulate') !== '0';
+let current = null;
+let frame = null;
+
+// ---------- Service Worker: віддає файли плеєблів за адресами ./play/… ----------
+const swReady = swSupported
+  ? navigator.serviceWorker.register('sw.js')
+      .then(() => Promise.race([
+        navigator.serviceWorker.ready.then(() => true),
+        new Promise((r) => setTimeout(() => r(false), 5000))
+      ]))
+      .catch(() => false)
+  : Promise.resolve(false);
+
+// ---------- IndexedDB ----------
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open('playables', 1);
+    r.onupgradeneeded = () => {
+      r.result.createObjectStore('items', { keyPath: 'id' });
+      r.result.createObjectStore('files', { keyPath: ['id', 'path'] });
+    };
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+const ask = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const done = (tx) => new Promise((res, rej) => {
+  tx.oncomplete = () => res();
+  tx.onerror = tx.onabort = () => rej(tx.error || new Error('Не вдалося зберегти'));
+});
+const filesOf = (id) => IDBKeyRange.bound([id, ''], [id, []]);
+
+async function loadItems() {
+  items = await ask(db.transaction('items').objectStore('items').getAll());
+  items.sort((a, b) => b.added - a.added);
+  render();
+}
+async function save(item, files) {
+  const tx = db.transaction(['items', 'files'], 'readwrite');
+  const store = tx.objectStore('files');
+  store.delete(filesOf(item.id));           // однойменний плеєбл замінюється
+  for (const f of files) store.put({ id: item.id, path: f.path, blob: f.blob });
+  tx.objectStore('items').put(item);
+  await done(tx);
+}
+async function remove(id) {
+  const tx = db.transaction(['items', 'files'], 'readwrite');
+  tx.objectStore('files').delete(filesOf(id));
+  tx.objectStore('items').delete(id);
+  await done(tx);
+}
+async function getFile(id, path) {
+  const rec = await ask(db.transaction('files').objectStore('files').get([id, path]));
+  return rec ? rec.blob : null;
+}
+
+// ---------- Імпорт ----------
+const baseName = (name) => name.replace(/\.[^.]+$/, '') || 'playable';
+
+async function importFiles(files) {
+  if (!db) return toast('⚠️ Сховище браузера недоступне');
+  let added = 0;
+  for (const file of files) {
+    try {
+      if (/\.zip$/i.test(file.name)) await addZip(file);
+      else if (/\.html?$/i.test(file.name)) await addHTML(file);
+      else throw new Error(`«${file.name}»: потрібен .html або .zip`);
+      added++;
+    } catch (err) {
+      toast('⚠️ ' + (err.message || err));
+    }
+  }
+  if (added) {
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    await loadItems();
+    toast(added === 1 ? 'Додано' : `Додано: ${added}`);
+  }
+}
+
+async function addHTML(file) {
+  const blob = new Blob([await file.arrayBuffer()], { type: 'text/html' });
+  const id = baseName(file.name);
+  await save({ id, name: id, entry: file.name, size: blob.size, count: 1, added: Date.now() },
+    [{ path: file.name, blob }]);
+}
+
+async function addZip(file) {
+  const files = (await unzip(file)).filter((f) =>
+    !f.path.startsWith('__MACOSX/') && !/(^|\/)\.DS_Store$/.test(f.path));
+  const entry = findEntry(files.map((f) => f.path));
+  if (!entry) throw new Error(`У «${file.name}» не знайдено .html`);
+  const id = baseName(file.name);
+  const size = files.reduce((sum, f) => sum + f.blob.size, 0);
+  await save({ id, name: id, entry, size, count: files.length, added: Date.now() }, files);
+}
+
+// index.html → будь-який .html → те саме на рівень-два глибше (zip часто містить одну папку)
+function findEntry(paths) {
+  const depth = (p) => p.split('/').length;
+  const isIndex = (p) => /(^|\/)index\.html?$/i.test(p) ? 0 : 1;
+  return paths
+    .filter((p) => /\.html?$/i.test(p) && depth(p) <= 3)
+    .sort((a, b) => depth(a) - depth(b) || isIndex(a) - isIndex(b) || a.localeCompare(b))[0] || null;
+}
+
+// Мінімальний розпаковувач zip (stored + deflate) на вбудованому DecompressionStream
+async function unzip(file) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const broken = () => new Error(`«${file.name}» — пошкоджений zip`);
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 65535); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw broken();
+  const total = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const utf8 = new TextDecoder();
+  const out = [];
+  for (let n = 0; n < total; n++) {
+    if (p + 46 > buf.length || dv.getUint32(p, true) !== 0x02014b50) throw broken();
+    const method = dv.getUint16(p + 10, true);
+    const csize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const local = dv.getUint32(p + 42, true);
+    const path = utf8.decode(buf.subarray(p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + dv.getUint16(p + 30, true) + dv.getUint16(p + 32, true);
+    if (path.endsWith('/')) continue;
+    if (dv.getUint32(local, true) !== 0x04034b50) throw broken();
+    const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+    const raw = buf.subarray(start, start + csize);
+    let data;
+    if (method === 0) data = raw;
+    else if (method === 8) data = await inflate(raw);
+    else throw new Error(`«${path}»: стиснення цього типу не підтримується`);
+    out.push({ path, blob: new Blob([data]) });
+  }
+  return out;
+}
+async function inflate(bytes) {
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+// ---------- Список ----------
+const sizeFmt = new Intl.NumberFormat('uk', { maximumFractionDigits: 1 });
+const timeFmt = new Intl.RelativeTimeFormat('uk', { numeric: 'auto' });
+const plural = new Intl.PluralRules('uk');
+const FILES = { one: 'файл', few: 'файли', many: 'файлів', other: 'файлу' };
+
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${sizeFmt.format(bytes / 1024)} КБ`;
+  return `${sizeFmt.format(bytes / 1024 / 1024)} МБ`;
+}
+function formatAgo(ts) {
+  const s = (ts - Date.now()) / 1000;
+  if (s > -45) return 'щойно';
+  const steps = [[60, 'second'], [60, 'minute'], [24, 'hour'], [7, 'day'], [4.35, 'week'], [12, 'month'], [Infinity, 'year']];
+  let v = s;
+  for (const [k, unit] of steps) {
+    if (Math.abs(v) < k) return timeFmt.format(Math.round(v), unit);
+    v /= k;
+  }
+}
+
+function render() {
+  const list = $('#list');
+  list.replaceChildren(...items.map((it) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button class="item"><span class="thumb">${ICON_PLAY}</span>
+      <span class="text"><span class="name"></span><span class="meta"></span></span>
+      <span class="size"></span></button><button class="del">${ICON_TRASH}</button>`;
+    li.querySelector('.name').textContent = it.name;
+    li.querySelector('.meta').textContent = (it.count > 1 ? `zip, ${it.count} ${FILES[plural.select(it.count)]}, ` : '') + formatAgo(it.added);
+    li.querySelector('.size').textContent = formatSize(it.size);
+    li.querySelector('.del').setAttribute('aria-label', `Видалити ${it.name}`);
+    li.querySelector('.item').addEventListener('click', () => play(it));
+    li.querySelector('.del').addEventListener('click', async () => {
+      if (!confirm(`Видалити «${it.name}»?`)) return;
+      await remove(it.id);
+      await loadItems();
+    });
+    return li;
+  }));
+  $('#empty').hidden = items.length > 0;
+}
+
+// ---------- Плеєр ----------
+function enterFullscreen() {
+  if (standalone || document.fullscreenElement || document.webkitFullscreenElement) return;
+  const el = document.documentElement;
+  const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!fn) return;   // iPhone: тільки через «На початковий екран»
+  try { const p = fn.call(el, { navigationUI: 'hide' }); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+}
+function exitFullscreen() {
+  if (!(document.fullscreenElement || document.webkitFullscreenElement)) return;
+  const fn = document.exitFullscreen || document.webkitExitFullscreen;
+  try { const p = fn.call(document); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+}
+
+function play(item) {
+  if (!swSupported && item.count > 1) {
+    return toast('⚠️ Плеєбли з кількох файлів працюють, коли сторінка відкрита за https-адресою');
+  }
+  enterFullscreen();                         // має статися одразу в обробнику тапу
+  current = item;
+  document.body.classList.add('playing');
+  $('#player').hidden = false;
+  history.pushState({ pp: 1 }, '');
+  launch();
+}
+
+async function launch() {
+  const item = current;
+  if (frame) frame.remove();
+  // чистий стан на кожен запуск, як у реальної реклами
+  try { sessionStorage.clear(); localStorage.clear(); localStorage.setItem('pp.emulate', emulate ? '1' : '0'); } catch (e) {}
+  window.__ppEmulate = emulate;
+
+  const f = document.createElement('iframe');
+  f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-modals allow-pointer-lock');
+  f.setAttribute('allow', 'autoplay; fullscreen; accelerometer; gyroscope; gamepad');
+  let firstLoad = true;
+  f.addEventListener('load', () => {
+    if (firstLoad) { firstLoad = false; return; }
+    try { void f.contentWindow.location.href; } catch (e) { toast('🛒 CTA → перехід на зовнішню сторінку'); }
+  });
+  frame = f;
+
+  if (await swReady) {
+    f.src = 'play/' + encodeURIComponent(item.id) + '/' + item.entry.split('/').map(encodeURIComponent).join('/');
+  } else if (item.count === 1) {
+    const blob = await getFile(item.id, item.entry);
+    f.srcdoc = injectInto(await blob.text(), new URL('inject.js', location.href).href);
+  } else {
+    toast('⚠️ Не вдалося запустити: онови сторінку');
+  }
+  if (current === item && frame === f) $('#player').prepend(f);
+}
+
+function injectInto(html, src) {
+  const tag = `<script src="${src}"><\/script>`;
+  for (const re of [/<head(\s[^>]*)?>/i, /<html(\s[^>]*)?>/i, /<!doctype[^>]*>/i]) {
+    const m = re.exec(html);
+    if (m) return html.slice(0, m.index + m[0].length) + tag + html.slice(m.index + m[0].length);
+  }
+  return tag + html;
+}
+
+function closePlayer(fromHistory) {
+  if (!current) return;
+  if (frame) frame.remove();
+  frame = null;
+  current = null;
+  $('#player').hidden = true;
+  document.body.classList.remove('playing');
+  exitFullscreen();
+  if (!fromHistory && history.state && history.state.pp) history.back();
+}
+
+// Події з плеєбла: CTA, помилки, виклики SDK
+window.addEventListener('message', (e) => {
+  if (!frame || e.source !== frame.contentWindow) return;
+  const d = e.data;
+  if (d && d.__pp) {
+    toast(d.type === 'cta' ? `🛒 CTA → ${d.data}` : d.type === 'error' ? `⚠️ ${d.data}` : d.data);
+  } else if (emulate && d === 'download') {
+    toast("🛒 CTA → postMessage('download')");      // Vungle / Liftoff
+  } else if (emulate && d === 'complete') {
+    toast("postMessage('complete')");
+  }
+});
+
+// ---------- Тост ----------
+let toastTimer;
+function toast(message) {
+  const t = $('#toast');
+  t.textContent = message;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  console.log('[playables]', message);
+}
+
+// ---------- Керування ----------
+const pick = () => $('#file').click();
+$('#add').addEventListener('click', pick);
+$('#add2').addEventListener('click', pick);
+$('#file').addEventListener('change', (e) => { importFiles([...e.target.files]); e.target.value = ''; });
+$('#close').addEventListener('click', () => closePlayer(false));
+$('#restart').addEventListener('click', () => current && launch());
+window.addEventListener('popstate', () => closePlayer(true));
+
+const sdkButton = $('#sdk');
+const syncSdk = () => sdkButton.setAttribute('aria-pressed', String(emulate));
+sdkButton.addEventListener('click', () => {
+  emulate = !emulate;
+  localStorage.setItem('pp.emulate', emulate ? '1' : '0');
+  syncSdk();
+  toast(emulate ? 'Емуляція SDK увімкнена' : 'Емуляція SDK вимкнена');
+});
+syncSdk();
+
+document.addEventListener('keydown', (e) => {
+  if (!current) return;
+  if (e.key === 'Escape') closePlayer(false);
+  if (e.key === 'r' && !e.metaKey && !e.ctrlKey) launch();
+});
+
+// Перетягування файлів на комп’ютері
+let dragDepth = 0;
+const hasFiles = (e) => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+window.addEventListener('dragenter', (e) => { if (hasFiles(e) && !current) { dragDepth++; $('#drop').hidden = false; } });
+window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('#drop').hidden = true; } });
+window.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+window.addEventListener('drop', (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  $('#drop').hidden = true;
+  if (!current) importFiles([...e.dataTransfer.files]);
+});
+
+if (isIOS && !standalone) $('#hint').hidden = false;
+
+(async () => {
+  try {
+    db = await openDB();
+    await loadItems();
+  } catch (err) {
+    render();
+    toast('⚠️ Сховище браузера недоступне: ' + (err && err.message || err));
+  }
+})();
+</script>
+</body>
+</html>
