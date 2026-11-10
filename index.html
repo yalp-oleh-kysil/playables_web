@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#000000">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Playables">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -105,7 +105,7 @@
   }
 
   #player { position: fixed; inset: 0; z-index: 20; background: #000; --t: 0px; --r: 0px; --b: 0px; --l: 0px; }
-  /* за замовчуванням гра не заходить під виріз, статус-бар і смужку «додому» */
+  /* режим «безпечна зона»: гра не заходить під виріз і смужку «додому» (вмикається кнопкою) */
   #player.safe {
     --t: env(safe-area-inset-top, 0px); --r: env(safe-area-inset-right, 0px);
     --b: env(safe-area-inset-bottom, 0px); --l: env(safe-area-inset-left, 0px);
@@ -188,7 +188,7 @@ const swSupported = 'serviceWorker' in navigator && window.isSecureContext && lo
 let db = null;
 let items = [];
 let emulate = localStorage.getItem('pp.emulate') !== '0';
-let edge = localStorage.getItem('pp.edge') === '1';   // true = гра заходить під виріз і смужку
+let edge = localStorage.getItem('pp.safe') !== '1';   // за замовчуванням гра на весь екран
 let current = null;
 let frame = null;
 
@@ -486,7 +486,7 @@ window.addEventListener('popstate', () => closePlayer(true));
 
 function savePrefs() {
   localStorage.setItem('pp.emulate', emulate ? '1' : '0');
-  localStorage.setItem('pp.edge', edge ? '1' : '0');
+  localStorage.setItem('pp.safe', edge ? '0' : '1');
 }
 
 const fitButton = $('#fit');
@@ -498,7 +498,7 @@ fitButton.addEventListener('click', () => {
   edge = !edge;
   savePrefs();
   syncFit();
-  toast(edge ? 'Гра на весь екран, разом із зоною вирізу' : 'Гра без вирізу і нижньої смужки');
+  toast(edge ? 'Гра на весь екран' : 'Гра не заходить під виріз і нижню смужку');
 });
 syncFit();
 
@@ -546,3 +546,4 @@ if (isIOS && !standalone) $('#hint').hidden = false;
 </script>
 </body>
 </html>
+<!-- v-test-marker -->
