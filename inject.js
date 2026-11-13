@@ -43,23 +43,63 @@
     });
   }
 
-  // ---- Роздільність: з якою щільністю гра реально малює свій canvas ----
-  window.addEventListener('load', function () {
-    setTimeout(function () {
-      var best = null, bestArea = 0;
-      Array.prototype.forEach.call(document.getElementsByTagName('canvas'), function (c) {
-        var r = c.getBoundingClientRect();
-        if (r.width * r.height > bestArea) { bestArea = r.width * r.height; best = { c: c, r: r }; }
+  // ---- Звук ----
+  // Рекламні SDK запускають WebView, де звуку не потрібен тап, тому багато плеєблів не «розблоковують»
+  // звук самі (або роблять це на touchstart, який iOS не рахує). Тут перший же тап запускає
+  // всі AudioContext гри, а при згортанні звук ставиться на паузу, як у справжній рекламі.
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  var contexts = [];
+  ['AudioContext', 'webkitAudioContext'].forEach(function (name) {
+    var Orig = window[name];
+    if (typeof Orig !== 'function') return;
+    try {
+      window[name] = class extends Orig {
+        constructor(options) {
+          if (options === undefined) super(); else super(options);
+          contexts.push(this);
+        }
+      };
+    } catch (e) {}
+  });
+  var waitingMedia = [];
+  var origPlay = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function () {
+    var el = this, p = origPlay.apply(this, arguments);
+    if (p && p.catch) {
+      p.catch(function (err) {
+        // повторюємо після тапу тільки музику (loop/autoplay), щоб разові звуки не вистрілили пізніше
+        if (err && err.name === 'NotAllowedError' && (el.loop || el.autoplay) && waitingMedia.indexOf(el) < 0) waitingMedia.push(el);
       });
-      if (!best || best.r.width < 50) return;
-      var dpr = window.devicePixelRatio || 1;
-      var ratio = best.c.width / best.r.width;
-      var screenPx = Math.round(window.innerWidth * dpr) + '×' + Math.round(window.innerHeight * dpr);
-      var game = best.c.width + '×' + best.c.height;
-      post('log', ratio >= dpr - 0.05
-        ? 'Рендер гри ' + game + ': повна роздільність екрана ✓'
-        : 'Рендер гри ' + game + ' (×' + (Math.round(ratio * 10) / 10) + '), екран ' + screenPx + ' (×' + dpr + ')');
-    }, 1500);
+    }
+    return p;
+  };
+  var unlock = function () {
+    contexts.forEach(function (ctx) {
+      if (ctx.state === 'running' || ctx.state === 'closed') return;
+      try { ctx.resume(); } catch (e) {}
+      try {
+        var src = ctx.createBufferSource();   // iOS: звук має реально стартувати всередині жесту
+        src.buffer = ctx.createBuffer(1, 1, 22050);
+        src.connect(ctx.destination);
+        src.start(0);
+      } catch (e) {}
+    });
+    waitingMedia.splice(0).forEach(function (el) {
+      try { var p = origPlay.call(el); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+    });
+  };
+  ['touchend', 'pointerup', 'mouseup', 'click', 'keydown'].forEach(function (type) {
+    window.addEventListener(type, unlock, { capture: true, passive: true });
+  });
+  var pausedByUs = [];
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      contexts.forEach(function (ctx) {
+        if (ctx.state === 'running') { pausedByUs.push(ctx); try { ctx.suspend(); } catch (e) {} }
+      });
+    } else {
+      pausedByUs.splice(0).forEach(function (ctx) { try { ctx.resume(); } catch (e) {} });
+    }
   });
 
   if (!emulate) return;
