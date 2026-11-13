@@ -43,6 +43,25 @@
     });
   }
 
+  // ---- Роздільність: з якою щільністю гра реально малює свій canvas ----
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      var best = null, bestArea = 0;
+      Array.prototype.forEach.call(document.getElementsByTagName('canvas'), function (c) {
+        var r = c.getBoundingClientRect();
+        if (r.width * r.height > bestArea) { bestArea = r.width * r.height; best = { c: c, r: r }; }
+      });
+      if (!best || best.r.width < 50) return;
+      var dpr = window.devicePixelRatio || 1;
+      var ratio = best.c.width / best.r.width;
+      var screenPx = Math.round(window.innerWidth * dpr) + '×' + Math.round(window.innerHeight * dpr);
+      var game = best.c.width + '×' + best.c.height;
+      post('log', ratio >= dpr - 0.05
+        ? 'Рендер гри ' + game + ': повна роздільність екрана ✓'
+        : 'Рендер гри ' + game + ' (×' + (Math.round(ratio * 10) / 10) + '), екран ' + screenPx + ' (×' + dpr + ')');
+    }, 1500);
+  });
+
   if (!emulate) return;
 
   // ---- Емуляція рекламних SDK ----

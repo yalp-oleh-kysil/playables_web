@@ -164,7 +164,7 @@
     <button id="add2" class="primary">Вибрати файли</button>
   </section>
   <input id="file" type="file" accept=".html,.htm,.zip,text/html,application/zip" multiple hidden>
-  <p id="version">версія 6</p>
+  <p id="version">версія 7</p>
 </main>
 
 <div id="player" hidden>
@@ -405,6 +405,7 @@ function play(item) {
     return toast('⚠️ Плеєбли з кількох файлів працюють, коли сторінка відкрита за https-адресою');
   }
   enterFullscreen();                         // має статися одразу в обробнику тапу
+  fixShortViewport();
   current = item;
   document.body.classList.add('playing');
   $('#player').hidden = false;
@@ -543,16 +544,27 @@ window.addEventListener('drop', (e) => {
 
 if (isIOS && !standalone) $('#hint').hidden = false;
 
-// Запасний варіант для WebKit 301108: міряємо, скільки iOS «недодав» знизу, і розтягуємо плеєр
+// Запасний варіант для WebKit 301108: якщо закріплені елементи все ж не доходять до низу екрана,
+// плеєр дотягується на різницю. Міряємо фактичну висоту fixed-шару, а не innerHeight,
+// і перераховуємо при кожному відкритті гри — інакше можна «перетягнути» гру за край екрана.
 function fixShortViewport() {
   if (!(standalone && /iPhone|iPod/.test(navigator.userAgent))) return;
-  const portrait = innerHeight >= innerWidth;
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;top:0;bottom:0;width:1px;visibility:hidden;pointer-events:none';
+  document.body.appendChild(probe);
+  const visible = probe.getBoundingClientRect().height;
+  probe.remove();
+  const portrait = matchMedia('(orientation: portrait)').matches;
   const full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
-  const gap = full - innerHeight;
-  document.documentElement.style.setProperty('--gap', (gap > 0 && gap < 100 ? gap : 0) + 'px');
+  const gap = Math.round(full - visible);
+  document.documentElement.style.setProperty('--gap', (gap > 0 && gap <= 80 ? gap : 0) + 'px');
 }
 addEventListener('resize', fixShortViewport);
+addEventListener('orientationchange', () => setTimeout(fixShortViewport, 300));
+addEventListener('pageshow', fixShortViewport);
+if (window.visualViewport) visualViewport.addEventListener('resize', fixShortViewport);
 fixShortViewport();
+setTimeout(fixShortViewport, 500);
 
 // iOS запам'ятовує вигляд статус-бару в момент додавання іконки. Якщо іконку додали
 // зі старої версії, гра не може зайти під годинник — підказуємо перевстановити.
