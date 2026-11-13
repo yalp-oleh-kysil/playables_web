@@ -75,6 +75,11 @@
   }
 
   #hint { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
+  #stale {
+    margin: 0 0 16px; padding: 12px 14px; border-radius: 14px;
+    font-size: 14px; background: var(--surface); border: 1.5px solid var(--accent);
+  }
+  #version { margin: 24px 0 0; text-align: center; font-size: 12px; color: var(--muted); }
 
   #list { list-style: none; margin: 0; padding: 0; border-radius: 16px; overflow: hidden; background: var(--surface); }
   #list:empty { display: none; }
@@ -151,6 +156,7 @@
     </button>
   </header>
   <p id="hint" hidden>Щоб плеєбли грали на весь екран, натисни «Поділитися» → «На початковий екран» і відкривай з іконки.</p>
+  <p id="stale" hidden>Ця іконка збережена зі старою версією, тому гра не заходить під годинник. Видали іконку з робочого столу, відкрий сайт у Safari, онови сторінку і додай на початковий екран знову.</p>
   <ul id="list"></ul>
   <section id="empty" hidden>
     <h2>Додай перший плеєбл</h2>
@@ -158,6 +164,7 @@
     <button id="add2" class="primary">Вибрати файли</button>
   </section>
   <input id="file" type="file" accept=".html,.htm,.zip,text/html,application/zip" multiple hidden>
+  <p id="version">версія 6</p>
 </main>
 
 <div id="player" hidden>
@@ -546,6 +553,20 @@ function fixShortViewport() {
 }
 addEventListener('resize', fixShortViewport);
 fixShortViewport();
+
+// iOS запам'ятовує вигляд статус-бару в момент додавання іконки. Якщо іконку додали
+// зі старої версії, гра не може зайти під годинник — підказуємо перевстановити.
+function insetTop() {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;top:0;height:env(safe-area-inset-top,0px);visibility:hidden';
+  document.body.appendChild(probe);
+  const h = probe.getBoundingClientRect().height;
+  probe.remove();
+  return h;
+}
+if (standalone && /iPhone|iPod/.test(navigator.userAgent) && innerHeight > innerWidth && insetTop() === 0) {
+  $('#stale').hidden = false;
+}
 
 (async () => {
   try {
