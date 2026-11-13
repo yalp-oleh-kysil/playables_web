@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#000000">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Playables">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -47,7 +47,9 @@
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
   }
-  body.playing { overflow: hidden; }
+  @media (display-mode: standalone), (display-mode: fullscreen) {
+    html { min-height: min(100lvh, calc(100% + env(safe-area-inset-top, 0px))); }
+  }
   button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   svg { display: block; }
@@ -104,7 +106,7 @@
     pointer-events: none;
   }
 
-  #player { position: fixed; inset: 0; z-index: 20; background: #000; --t: 0px; --r: 0px; --b: 0px; --l: 0px; }
+  #player { position: fixed; top: 0; left: 0; right: 0; bottom: calc(-1 * var(--gap, 0px)); z-index: 20; background: #000; --t: 0px; --r: 0px; --b: 0px; --l: 0px; }
   /* режим «безпечна зона»: гра не заходить під виріз і смужку «додому» (вмикається кнопкою) */
   #player.safe {
     --t: env(safe-area-inset-top, 0px); --r: env(safe-area-inset-right, 0px);
@@ -117,7 +119,7 @@
   }
   .controls {
     position: absolute; z-index: 1; display: flex; gap: 10px;
-    top: calc(env(safe-area-inset-top) + 8px); left: calc(env(safe-area-inset-left) + 8px);
+    top: calc(env(safe-area-inset-top) + 30px); left: calc(env(safe-area-inset-left) + 8px);
   }
   .controls button {
     width: 32px; height: 32px; border-radius: 50%;
@@ -533,6 +535,17 @@ window.addEventListener('drop', (e) => {
 });
 
 if (isIOS && !standalone) $('#hint').hidden = false;
+
+// Запасний варіант для WebKit 301108: міряємо, скільки iOS «недодав» знизу, і розтягуємо плеєр
+function fixShortViewport() {
+  if (!(standalone && /iPhone|iPod/.test(navigator.userAgent))) return;
+  const portrait = innerHeight >= innerWidth;
+  const full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+  const gap = full - innerHeight;
+  document.documentElement.style.setProperty('--gap', (gap > 0 && gap < 100 ? gap : 0) + 'px');
+}
+addEventListener('resize', fixShortViewport);
+fixShortViewport();
 
 (async () => {
   try {
